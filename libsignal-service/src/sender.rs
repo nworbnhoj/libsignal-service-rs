@@ -124,7 +124,7 @@ where
             .await?;
 
         let messages = OutgoingPushMessages {
-            destination: recipient.identifier(),
+            destination: &recipient.identifier(),
             timestamp,
             messages,
             online,
@@ -145,12 +145,16 @@ where
                     if let Some(ref uuid) = recipient.uuid {
                         self.cipher.store_context.delete_session(
                             &libsignal_protocol::Address::new(
-                                uuid,
+                                uuid.to_string(),
                                 *extra_device_id,
                             ),
                         )?;
                     }
                     if let Some(ref e164) = recipient.e164 {
+                        let e164 = e164
+                            .format()
+                            .mode(phonenumber::Mode::E164)
+                            .to_string();
                         self.cipher.store_context.delete_session(
                             &libsignal_protocol::Address::new(
                                 &e164,
@@ -200,12 +204,16 @@ where
                     if let Some(ref uuid) = recipient.uuid {
                         self.cipher.store_context.delete_session(
                             &libsignal_protocol::Address::new(
-                                uuid,
+                                uuid.to_string(),
                                 *extra_device_id,
                             ),
                         )?;
                     }
                     if let Some(ref e164) = recipient.e164 {
+                        let e164 = e164
+                            .format()
+                            .mode(phonenumber::Mode::E164)
+                            .to_string();
                         self.cipher.store_context.delete_session(
                             &libsignal_protocol::Address::new(
                                 &e164,
@@ -246,7 +254,7 @@ where
         for device_id in self
             .cipher
             .store_context
-            .get_sub_device_sessions(recipient.identifier())?
+            .get_sub_device_sessions(&recipient.identifier())?
         {
             if self.cipher.store_context.contains_session(&Address::new(
                 recipient.identifier(),

@@ -1,3 +1,6 @@
+use phonenumber::PhoneNumber;
+use uuid::Uuid;
+
 use aes_ctr::{
     cipher::stream::{NewStreamCipher, StreamCipher},
     Aes256Ctr,
@@ -43,6 +46,12 @@ pub enum SealedSessionError {
 
     #[error("recipient not trusted")]
     NoSessionWithRecipient,
+
+    #[error("Supplied phone number could not be parsed")]
+    InvalidE164Error(#[from] uuid::Error),
+
+    #[error("Supplied uuid could not be parsed")]
+    InvalidUuidError(#[from] phonenumber::ParseError),
 }
 
 #[derive(thiserror::Error, Debug)]
@@ -94,8 +103,8 @@ pub struct SenderCertificate {
     signer: ServerCertificate,
     key: PublicKey,
     sender_device_id: i32,
-    sender_uuid: Option<String>,
-    sender_e164: Option<String>,
+    sender_uuid: Option<uuid::Uuid>,
+    sender_e164: Option<phonenumber::PhoneNumber>,
     expiration: u64,
     pub certificate: Vec<u8>,
     pub signature: Vec<u8>,
@@ -129,8 +138,8 @@ pub struct CertificateValidator {
 
 #[derive(Default, Debug, Clone)]
 pub(crate) struct DecryptionResult {
-    pub sender_uuid: Option<String>,
-    pub sender_e164: Option<String>,
+    pub sender_uuid: Option<Uuid>,
+    pub sender_e164: Option<PhoneNumber>,
     pub device_id: i32,
     pub padded_message: Vec<u8>,
     pub version: u32,
@@ -574,6 +583,14 @@ impl SenderCertificate {
                         if sender_e164.is_none() && sender_uuid.is_none() {
                             return Err(SealedSessionError::InvalidCertificate);
                         }
+
+                        let sender_e164 = sender_e164
+                            .map(|s| phonenumber::parse(None, s))
+                            .transpose()?;
+                        let sender_uuid = sender_uuid
+                            .as_deref()
+                            .map(Uuid::parse_str)
+                            .transpose()?;
 
                         Ok(Self {
                             signer: ServerCertificate::try_from(
