@@ -1,7 +1,8 @@
 use crate::pre_keys::{PreKeyEntity, PreKeyState};
 use crate::push_service::{
-    ConfirmDeviceMessage, DeviceId, PushService, ServiceError,
-    SmsVerificationCodeResponse, VoiceVerificationCodeResponse,
+    ConfirmDeviceMessage, ContactTokenDetails, ContactTokenList, DeviceId,
+    PushService, ServiceError, SmsVerificationCodeResponse,
+    VoiceVerificationCodeResponse,
 };
 
 use std::convert::TryFrom;
@@ -118,5 +119,49 @@ impl<Service: PushService> AccountManager<Service> {
             pre_keys_offset_id + PRE_KEY_BATCH_SIZE,
             next_signed_pre_key_id + 1,
         ))
+    }
+
+    /// Checks which contacts in a set are registered with the server.
+    ///
+    /// Equivalent with AccountManager::getContacts
+    pub async fn get_contacts(
+        &mut self,
+        numbers: impl AsRef<[phonenumber::PhoneNumber]>,
+    ) -> Result<
+        Vec<(phonenumber::PhoneNumber, ContactTokenDetails)>,
+        ServiceError,
+    > {
+        let numbers = numbers.as_ref();
+
+        // createDirectoryServerTokenMap
+        let contacts = numbers.iter().map(|number| {
+            // createDirectoryServerToken
+            use sha1::Digest;
+
+            let e164 =
+                number.format().mode(phonenumber::Mode::E164).to_string();
+            let mut sha = sha1::Sha1::new();
+            sha.update(e164);
+            let sha = sha.finalize();
+            (base64::encode(&sha[0..10]), number)
+        });
+
+        let contacts: std::collections::HashMap<_, _> = contacts.collect();
+
+        let tokens = ContactTokenList {
+            // XXX unnecessary allocation
+            contacts: contacts.keys().cloned().collect(),
+        };
+
+        let active_tokens = self.service.retrieve_directory(tokens).await?;
+
+        // Fill in the numbers
+        Ok(active_tokens
+            .contacts
+            .into_iter()
+            .filter_map(|token| {
+                Some(((*contacts.get(&token.token)?).clone(), token))
+            })
+            .collect())
     }
 }

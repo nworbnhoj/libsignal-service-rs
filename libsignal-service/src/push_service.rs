@@ -113,6 +113,12 @@ pub struct DeviceCapabilities {
     pub storage: bool,
 }
 
+#[derive(Debug, Serialize, Default)]
+#[serde(rename_all = "camelCase")]
+pub struct ContactTokenList {
+    pub contacts: Vec<String>,
+}
+
 pub struct ProfileKey(pub Vec<u8>);
 
 #[derive(Debug, Deserialize, Default)]
@@ -213,6 +219,23 @@ pub struct MismatchedDevices {
 #[serde(rename_all = "camelCase")]
 pub struct StaleDevices {
     pub stale_devices: Vec<i32>,
+}
+
+#[derive(Debug, Deserialize, Default)]
+#[serde(rename_all = "camelCase")]
+pub struct ContactTokenDetailsList {
+    pub contacts: Vec<ContactTokenDetails>,
+}
+
+#[derive(Debug, Deserialize, Default)]
+#[serde(rename_all = "camelCase")]
+pub struct ContactTokenDetails {
+    pub token: String,
+    pub relay: String,
+    // We do not provide `number` in this struct, because it's not returned by OWS
+    // pub number: String,
+    pub voice: bool,
+    pub video: bool,
 }
 
 #[derive(thiserror::Error, Debug)]
@@ -497,6 +520,16 @@ pub trait PushService {
             pre_keys.push(bundle.build()?)
         }
         Ok(pre_keys)
+    }
+
+    /// Checks which contacts in a set are registered with the server.
+    ///
+    /// Equivalent with `PushServiceSocket::retrieveDirectory`.
+    async fn retrieve_directory(
+        &mut self,
+        tokens: ContactTokenList,
+    ) -> Result<ContactTokenDetailsList, ServiceError> {
+        Ok(self.put("/v1/directory/tokens", tokens).await?)
     }
 
     async fn ws(
