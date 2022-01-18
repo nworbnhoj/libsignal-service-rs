@@ -4,9 +4,8 @@ mod pipe;
 
 pub use cipher::ProvisioningCipher;
 pub use manager::{
-    ConfirmCodeMessage, ConfirmCodeResponse, ConfirmDeviceMessage,
-    LinkingManager, ProvisioningManager, SecondaryDeviceProvisioning,
-    VerificationCodeResponse,
+    ConfirmCodeMessage, ConfirmCodeResponse, LinkingManager,
+    ProvisioningManager, SecondaryDeviceProvisioning, VerificationCodeResponse,
 };
 
 use crate::prelude::ServiceError;
@@ -31,6 +30,8 @@ pub enum ProvisioningError {
     ProtocolError(#[from] libsignal_protocol::error::SignalProtocolError),
     #[error("ProvisioningCipher in encrypt-only mode")]
     EncryptOnlyProvisioningCipher,
+    #[error(transparent)]
+    MacError(#[from] crate::sealed_session_cipher::MacError),
 }
 
 pub fn generate_registration_id<R: rand::Rng + rand::CryptoRng>(
